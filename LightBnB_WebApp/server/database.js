@@ -22,7 +22,7 @@ const getUserWithEmail = function(email) {
   from users
   where email = $1;
   `
-  pool.query(queryString, [email])
+  return pool.query(queryString, [email])
   .then(res => {
     if (res.rows.length > 0){
     return (res.rows[0])}
@@ -37,13 +37,12 @@ exports.getUserWithEmail = getUserWithEmail;
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  let user;
   const queryString = `
   select *
   from users
   where id = $1;
   `
-  pool.query(queryString, [id])
+  return pool.query(queryString, [id])
   .then(res => {
     if (res.rows.length > 0){
     return (res.rows[0])}
@@ -75,7 +74,29 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+  // const queryString = `
+  // select reservations.*
+  // from users join reservations on user.id = reservations.guest_id
+  // where guest_id = $1 AND reservations.end_date < now() :: date;
+  // `
+  // pool.query(queryString,[guest_id])
+  // .then(res => {
+  //   res.rows
+  // })
+  // .catch(err => console.log(`query error ${err.stack}`));
+  const queryString = `SELECT reservations.*, properties.*
+  FROM reservations
+  JOIN properties ON properties.id = reservations.property_id
+JOIN property_reviews ON properties.id = property_reviews.property_id
+WHERE reservations.end_date < now()::date AND reservations.guest_id = $1
+GROUP BY reservations.id, properties.id, property_reviews.id
+ORDER BY reservations.start_date
+LIMIT $2`;
+  const values = [guest_id, limit];
+  pool.query(queryString, values)
+    .then(res => console.log(res.rows))
+    .catch(err => console.log('query error', err.stack))
+
 }
 exports.getAllReservations = getAllReservations;
 
@@ -92,13 +113,15 @@ const getAllProperties = function(options, limit = 10) {
   // for (let i = 1; i <= limit; i++) {
   //   limitedProperties[i] = properties[i];
   // }
-  pool.query(`
+  const queryString = `
   SELECT * FROM properties
   LIMIT $1
-  `, [limit])
+  `
+  pool.query(queryString, [limit])
   .then(res => {
     (res.rows)
-  });
+  })
+  .catch(err => console.log('query error', err.stack));
 }
 exports.getAllProperties = getAllProperties;
 
